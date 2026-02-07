@@ -1,0 +1,63 @@
+{
+  "ociVersion": "1.0.2",
+  "process": {
+    "terminal": true,
+    "user": {
+      "uid": 0,
+      "gid": 0
+    },
+    "args": [
+      "/bin/sh"
+    ],
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm"
+    ],
+    "cwd": "/",
+    "noNewPrivileges": true
+  },
+  "root": {
+    "path": "rootfs",
+    "readonly": false
+  },
+  "hostname": "nano-kata",
+  "mounts": [
+    {
+      "destination": "/proc",
+      "type": "proc",
+      "source": "proc"
+    },
+    {
+      "destination": "/dev",
+      "type": "tmpfs",
+      "source": "tmpfs"
+    },
+    {
+      "destination": "/dev/pts",
+      "type": "devpts",
+      "source": "devpts"
+    }
+  ],
+  "linux": {
+    "namespaces": [
+      {
+        "type": "pid"
+      },
+      {
+        "type": "network"
+      },
+      {
+        "type": "ipc"
+      },
+      {
+        "type": "uts"
+      },
+      {
+        "type": "mount"
+      }
+    ]
+  },
+  "annotations": {
+    "io.katacontainers.runtime": "container"
+  }
+}

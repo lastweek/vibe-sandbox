@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+
+# Run the full integration test
+
+set timeout 30
+spawn ssh -p 2222 ys@localhost
+
+expect "password:"
+send "root\r"
+
+expect -re "\\$"
+send "cd ~/mac/vibe-kata\r"
+expect -re "\\$"
+
+send "echo '=== Running Integration Tests ==='\r"
+expect -re "\\$"
+
+send "./tests/integration/test_basic.sh\r"
+expect -re "\\$"
+
+send "exit\r"
+expect eof

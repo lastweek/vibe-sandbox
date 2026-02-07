@@ -1,0 +1,37 @@
+#!/usr/bin/expect -f
+
+# Test the built nano-kata binary
+
+set timeout 30
+spawn ssh -p 2222 ys@localhost
+
+expect "password:"
+send "root\r"
+
+expect -re "\\$"
+send "cd ~/mac/vibe-kata\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime -v\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime create --bundle=./tests/bundle test1\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime state test1\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime start test1\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime state test1\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime delete test1\r"
+expect -re "\\$"
+
+send "ls -la run/\r"
+expect -re "\\$"
+
+send "exit\r"
+expect eof

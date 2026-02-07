@@ -1,0 +1,41 @@
+#!/usr/bin/expect -f
+
+# Simple expect script to build nano-kata (requires libjansson-dev already installed)
+
+set timeout 60
+spawn ssh -p 2222 ys@localhost
+
+# Handle SSH password
+expect "password:"
+send "root\r"
+
+# Wait for shell prompt
+expect -re "\\$"
+
+send "cd ~/mac/vibe-kata\r"
+expect -re "\\$"
+
+send "make clean\r"
+expect -re "\\$"
+
+send "make 2>&1 | tee build.log\r"
+expect -re "\\$"
+
+send "echo ''\r"
+expect -re "\\$"
+
+send "echo '=== Build Complete ==='\r"
+expect -re "\\$"
+
+send "ls -lh bin/nk-runtime\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime --version\r"
+expect -re "\\$"
+
+send "./bin/nk-runtime --help | head -25\r"
+expect -re "\\$"
+
+send "exit\r"
+
+expect eof

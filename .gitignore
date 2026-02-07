@@ -1,0 +1,20 @@
+# Build artifacts
+obj/
+bin/
+build/
+
+# Runtime state
+run/
+
+# Editor files
+*.o
+*.a
+*~
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test artifacts
+*.log

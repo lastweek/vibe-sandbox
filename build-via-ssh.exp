@@ -1,0 +1,61 @@
+#!/usr/bin/expect -f
+
+# Expect script to SSH and build nano-kata
+
+set timeout 120
+spawn ssh -p 2222 ys@localhost
+
+# Handle SSH password prompt
+expect {
+    "password:" {
+        send "root\r"
+        exp_continue
+    }
+    -re "\\$" {
+        # We're in, now run build commands
+        send "cd ~/mac/vibe-kata\r"
+        expect "\\$"
+
+        send "echo '=== Installing dependencies ==='\r"
+        expect "\\$"
+
+        # Function to handle sudo commands with password
+        proc sudo_cmd {cmd} {
+            send "$cmd\r"
+            expect {
+                "password:" {
+                    send "root\r"
+                    expect "\\$"
+                }
+                "\\$" {}
+                timeout {puts "Timeout waiting for command to complete"; exit 1}
+            }
+        }
+
+        sudo_cmd "sudo apt-get update"
+        sudo_cmd "sudo apt-get install -y libjansson-dev"
+
+        send "echo '=== Cleaning build ==='\r"
+        expect "\\$"
+        send "make clean\r"
+        expect "\\$"
+
+        send "echo '=== Building ==='\r"
+        expect "\\$"
+        send "make 2>&1 | tee build.log\r"
+        expect "\\$"
+
+        send "echo ''\r"
+        expect "\\$"
+        send "echo '=== Testing binary ==='\r"
+        expect "\\$"
+        send "./bin/nk-runtime --version\r"
+        expect "\\$"
+        send "./bin/nk-runtime --help | head -20\r"
+        expect "\\$"
+
+        send "exit\r"
+    }
+}
+
+expect eof
