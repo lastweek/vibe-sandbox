@@ -239,38 +239,84 @@ nano-sandbox/
 └── README.md
 ```
 
-## Implementation Plan
+## Implementation Status
 
 ### ✅ Phase 1: Foundation (Complete)
-- Project setup, OCI spec parsing, CLI, state management
+- Project setup, build system, directory structure
+- OCI spec parsing and validation (jansson)
+- CLI with argument parsing (getopt_long)
+- State management (JSON persistence)
+- Test infrastructure (smoke, integration, perf)
 
-### 🚧 Phase 2: Pure Container Execution (Next)
-- [ ] Linux namespace setup (pid, net, ipc, uts, mount, user, cgroup)
-- [ ] Filesystem operations (pivot root, mount propagation)
-- [ ] cgroups v2 integration (memory, CPU, PIDs limits)
-- [ ] Process execution with proper isolation
-- [ ] Signal handling and forwarding
+**Deliverables:**
+- `src/oci/spec.c` - OCI spec parser
+- `src/common/state.c` - State persistence
+- `src/common/log.c` - Structured logging
+- `src/main.c` - CLI orchestration
+- Comprehensive test suites
 
-### Phase 3: VM Mode Architecture
-- [ ] Firecracker integration
-- [ ] MicroVM root filesystem
-- [ ] Guest agent for in-VM container execution
+### ✅ Phase 2: Pure Container Execution (Complete)
+- Linux namespace setup (pid, net, ipc, uts, mount)
+- Filesystem operations (pivot_root, mount propagation)
+- cgroups v2 integration (memory, CPU, PIDs limits)
+- Process execution with proper isolation
+- Signal handling and forwarding
+- Parent/child synchronization via pipe
+- Lifecycle commands: create, start, run, exec, delete, state
 
-### Phase 4: Advanced Features
-- [ ] Container hooks
-- [ ] Seccomp filters
-- [ ] AppArmor/SELinux integration
-- [ ] Device management
+**Deliverables:**
+- `src/container/namespaces.c` - Namespace setup
+- `src/container/mounts.c` - Rootfs and mounts
+- `src/container/cgroups.c` - Resource limits
+- `src/container/process.c` - Process creation
+- Full OCI runtime compliance for basic containers
 
-### Phase 5: Containerd Shim Integration
-- [ ] Shim v2 protocol
-- [ ] Runtime registration
+**Code Size:** ~3,200 lines of C code
 
-### Phase 6: Production Readiness
-- [ ] Logging and monitoring
-- [ ] Error handling and recovery
-- [ ] Comprehensive testing
-- [ ] Documentation
+### 🚧 Phase 3: VM Mode (Planned - [see detailed plan](docs/vm-mode-plan.md))
+- [ ] Firecracker integration (HTTP API client)
+- [ ] VM lifecycle management (create, start, stop, delete)
+- [ ] Guest kernel build (vmlinux for Firecracker)
+- [ ] Guest rootfs/initramfs with busybox
+- [ ] Guest agent (vsock communication)
+- [ ] In-VM container execution (runc/nano-sandbox)
+- [ ] CLI integration (--mode=vm flag)
+- [ ] Networking (TAP device setup)
+- [ ] I/O forwarding (stdout/stderr/stdin)
+
+**Estimated:** ~1,000 lines of C code
+
+**Documentation:** [docs/vm-mode-plan.md](docs/vm-mode-plan.md)
+
+### Phase 4: Security Features (Future)
+- [ ] Seccomp filter support (syscall filtering)
+- [ ] AppArmor profile integration
+- [ ] SELinux context management
+- [ ] Capability dropping (libcap-ng)
+- [ ] User namespace mapping (UID/GID)
+- [ ] Device cgroup allowlist
+- [ ] Rootless container support
+
+**Goal:** Production-grade security hardening
+
+### Phase 5: Containerd Integration (Future)
+- [ ] Shim v2 protocol implementation
+- [ ] containerd runtime registration
+- [ ] CRI (Container Runtime Interface) compatibility
+- [ ] Kubernetes pod support (multi-container pods)
+- [ ] Sandbox management
+
+**Goal:** Run as Kubernetes runtime
+
+### Phase 6: Production Readiness (Future)
+- [ ] Comprehensive error handling
+- [ ] Resource cleanup guarantees
+- [ ] Performance benchmarking and optimization
+- [ ] Security audit
+- [ ] CVE scanning and remediation
+- [ ] Production deployment guide
+
+**Goal:** Production-ready alternative to runc/crun
 
 ## Testing in Linux Environment
 
@@ -313,25 +359,44 @@ For ECS/remote server workflow (SSH key auth), use:
 # first-time deps: ./scripts/ecs-sync-test.sh --bootstrap integration
 ```
 
-## Learning Outcomes (Phase 1)
+## Learning Outcomes (Phases 1 & 2)
 
-By completing Phase 1, you've learned:
+By completing Phases 1 and 2, you've learned:
 
-1. **OCI Runtime Spec** - Understanding container bundle format and config.json
-2. **JSON Parsing** - Using jansson library for spec parsing
+**Phase 1 - Foundation:**
+1. **OCI Runtime Spec** - Container bundle format and config.json structure
+2. **JSON Parsing** - Using jansson library for spec parsing and validation
 3. **State Management** - Persisting container state to disk
-4. **CLI Design** - Building a command-line interface with getopt
+4. **CLI Design** - Building a command-line interface with getopt_long
 5. **Project Structure** - Organizing a C project with headers, sources, and tests
+
+**Phase 2 - Container Execution:**
+1. **Process Creation** - Using clone() with namespace flags (not fork())
+2. **Linux Namespaces** - PID, network, IPC, UTS, mount isolation
+3. **Filesystem Isolation** - pivot_root() and mount propagation
+4. **Cgroups v2** - Memory, CPU, and PID limits
+5. **Parent/Child Synchronization** - Pipe-based signaling for setup coordination
+6. **Signal Handling** - Forwarding SIGTERM/SIGKILL to container process
+7. **Container Lifecycle** - Complete create/start/run/exec/delete/state implementation
+
+**Key Skills Gained:**
+- Systems programming with Linux kernel APIs
+- Understanding how container runticks actually work
+- Reading and implementing specifications (OCI)
+- Building production-quality C code with proper error handling
+- Writing comprehensive tests (smoke, integration, performance)
 
 ## Next Steps
 
-Continue with **Phase 2** to implement:
-- Linux namespaces for process isolation
-- cgroups for resource management
-- Filesystem operations (pivot root, mounts)
-- Actual container process execution
+Continue with **Phase 3: VM Mode** to implement:
+- Firecracker VMM integration for VM-based containers
+- Guest kernel and rootfs build
+- vsock-based guest agent
+- Container execution inside lightweight VMs
 
-This will enable running real containers!
+**See detailed plan:** [docs/vm-mode-plan.md](docs/vm-mode-plan.md)
+
+This will provide stronger isolation through hardware virtualization, similar to Kata Containers but with educational simplicity.
 
 ## Resources
 

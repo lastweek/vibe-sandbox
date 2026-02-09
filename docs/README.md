@@ -19,6 +19,7 @@
 | [Architecture Overview](architecture-overview.md) ⭐ | System design, components, data flow | All users |
 | [Command Reference](command-reference.md) ⭐ | Detailed command execution flows | Users, developers |
 | [Ecosystem Position](ecosystem-position.md) ⭐ | Where it fits in container stack | Architects, learners |
+| [VM Mode Plan](vm-mode-plan.md) ⭐ NEW | VM-based execution design | Advanced learners |
 | [Kernel Mechanisms](kernel-mechanisms.md) | Linux primitives used | Systems programmers |
 | [Execution Flow](execution-flow.md) | Original execution flow diagrams | Reference |
 | [Container Ecosystem](container-ecosystem-lifecycle.md) | Image-to-container lifecycle | Context |
@@ -224,6 +225,21 @@ Development workflow documentation:
 - Preflight validation
 
 **Best for:** Setting up development environment
+
+### VM Mode Plan ⭐ NEW
+
+**[vm-mode-plan.md](vm-mode-plan.md)**
+
+Comprehensive plan for VM-based container execution:
+- Architecture design (nano-sandbox vs Kata Containers)
+- API specification for VM lifecycle
+- Guest agent protocol design
+- Firecracker integration details
+- Implementation phases (1-6)
+- Educational value and learning exercises
+- Complete workflow examples
+
+**Best for:** Understanding VM-based container runtimes and planning implementation
 
 ## Diagram Index
 
