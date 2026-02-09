@@ -89,7 +89,7 @@ static nk_oci_process_t *parse_process(json_t *proc_obj) {
     }
 
     size_t args_len = json_array_size(args);
-    proc->args = calloc(args_len, sizeof(char *));
+    proc->args = calloc(args_len + 1, sizeof(char *));
     if (!proc->args) {
         free(proc);
         return NULL;
@@ -107,7 +107,7 @@ static nk_oci_process_t *parse_process(json_t *proc_obj) {
     json_t *env = json_object_get(proc_obj, "env");
     if (env && json_is_array(env)) {
         size_t env_len = json_array_size(env);
-        proc->env = calloc(env_len, sizeof(char *));
+        proc->env = calloc(env_len + 1, sizeof(char *));
         if (proc->env) {
             for (size_t i = 0; i < env_len; i++) {
                 json_t *e = json_array_get(env, i);

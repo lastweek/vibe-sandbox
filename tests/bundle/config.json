@@ -1,13 +1,16 @@
 {
   "ociVersion": "1.0.2",
   "process": {
-    "terminal": true,
+    "terminal": false,
     "user": {
       "uid": 0,
       "gid": 0
     },
     "args": [
-      "/bin/sh"
+      "/bin/busybox",
+      "sh",
+      "-c",
+      "while :; do /bin/busybox sleep 3600; done"
     ],
     "env": [
       "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",

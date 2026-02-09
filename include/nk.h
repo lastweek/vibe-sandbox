@@ -1,6 +1,7 @@
 #ifndef NK_H
 #define NK_H
 
+#include <sys/types.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -37,10 +38,11 @@ typedef struct nk_container {
 
 /* Command-line options */
 typedef struct nk_options {
-    char *command;                  /* create|start|run|delete|state */
+    char *command;                  /* create|start|run|exec|delete|state */
     char *container_id;             /* Container ID */
     char *bundle_path;              /* Bundle path */
     char *pid_file;                 /* PID file path */
+    char *resume_exec;              /* Optional command for resume */
     nk_execution_mode_t mode;       /* Execution mode */
     bool attach;                    /* Attach to container process */
     bool detach;                    /* Run detached from terminal */
@@ -84,6 +86,15 @@ int nk_container_start(const char *container_id, bool attach, int *container_exi
  * Returns: 0 on success, -1 on error
  */
 int nk_container_run(const nk_options_t *opts);
+
+/**
+ * nk_container_resume - Re-enter a running container namespace
+ * @container_id: Container ID
+ * @exec_cmd: Optional command to run via /bin/sh -lc (NULL => interactive shell)
+ *
+ * Returns: command exit code on success, -1 on runtime/setup error
+ */
+int nk_container_resume(const char *container_id, const char *exec_cmd);
 
 /**
  * nk_container_delete - Delete a container

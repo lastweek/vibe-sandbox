@@ -5,6 +5,7 @@
 - `create`: parse + validate OCI bundle, persist metadata, no process spawned.
 - `start`: load created container, build execution context, clone child, start process.
 - `run`: `create` + `start` in one command; attached by default.
+- `exec`: enter namespaces of a running container (`nsenter`), interactive by default.
 - `delete`: stop running process (if needed), cleanup cgroup/state.
 - `state`: query persisted state; non-zero exit for not found.
 
@@ -16,8 +17,9 @@ flowchart TD
     B -->|create| C[nk_container_create]
     B -->|start| D[nk_container_start]
     B -->|run| E[nk_container_run]
-    B -->|delete| F[nk_container_delete]
-    B -->|state| G[nk_container_state]
+    B -->|exec| F[nk_container_resume]
+    B -->|delete| G[nk_container_delete]
+    B -->|state| I[nk_container_state]
     B -->|help/version| H[print help/version]
 
     E --> C
@@ -77,6 +79,34 @@ flowchart TD
 Return semantics:
 - Attached mode returns container process exit code.
 - Detached mode returns runtime operation status.
+
+## `exec` Flow
+
+Design reference: for rationale, invariants, and failure boundaries, see [`exec-design.md`](exec-design.md).
+
+1. Load container state.
+2. Enforce state precondition (`RUNNING` + live init PID).
+3. Require host `/proc` to be mounted (`nsenter` depends on `/proc/<pid>/ns/*`).
+4. Spawn `nsenter --target <pid> --mount --uts --ipc --net --pid`.
+5. Execute:
+   - interactive mode: `/bin/sh`
+   - command mode: `/bin/sh -lc "<cmd>"`
+6. Return entered-command exit code.
+7. If init PID is gone, persist `STOPPED` state.
+
+```mermaid
+flowchart TD
+    R1[load saved container state] --> R2{state == RUNNING && pid > 0?}
+    R2 -->|no| Rx[fail]
+    R2 -->|yes| R3{init pid alive?}
+    R3 -->|no| R4[mark STOPPED]
+    R4 --> Rx
+    R3 -->|yes| R5{host /proc available?}
+    R5 -->|no| Rx
+    R5 -->|yes| R6[fork + exec nsenter]
+    R6 --> R7[wait child]
+    R7 --> R8[return child exit code]
+```
 
 ## Child Process Startup (`nk_container_exec`)
 
@@ -142,6 +172,7 @@ Failure classes are surfaced in three layers:
 stateDiagram-v2
     [*] --> CREATED: create
     CREATED --> RUNNING: start or run
+    RUNNING --> RUNNING: exec
     RUNNING --> STOPPED: attached wait exit
     CREATED --> DELETED: delete
     RUNNING --> DELETED: delete

@@ -104,6 +104,7 @@ static void print_usage(const char *prog_name) {
     nk_stderr( "  create [options] <container-id>  Create a new container\n");
     nk_stderr( "  start [options] <container-id>    Start an existing container\n");
     nk_stderr( "  run [options] <container-id>      Create + start (Docker-style)\n");
+    nk_stderr( "  exec [options] <container-id>     Run a command in a running container\n");
     nk_stderr( "  delete <container-id>             Delete a container\n");
     nk_stderr( "  state <container-id>              Query container state\n\n");
     nk_stderr( "Options:\n");
@@ -113,6 +114,7 @@ static void print_usage(const char *prog_name) {
     nk_stderr( "  -p, --pid-file=<file>  File to write container PID\n");
     nk_stderr( "  -a, --attach           Attach: wait for container process (start/run)\n");
     nk_stderr( "  -d, --detach           Detached mode: return after start (start/run)\n");
+    nk_stderr( "  -x, --exec=<command>   Command for exec (default: interactive /bin/sh)\n");
     nk_stderr( "      --rm               Remove container when attached run exits\n");
     nk_stderr( "  -V, --verbose          Enable verbose logging\n");
     nk_stderr( "  -E, --educational      Enable educational mode (explains operations)\n");
@@ -123,6 +125,10 @@ static void print_usage(const char *prog_name) {
     nk_stderr( "  start (default)       Detached, like 'docker start'\n");
     nk_stderr( "  run (default)         Attached, like 'docker run'\n");
     nk_stderr( "  run -d                Detached create+start, like 'docker run -d'\n");
+    nk_stderr( "  exec                  Enter running container namespaces with nsenter\n");
+    nk_stderr( "  exec -x '<cmd>'       Run one command inside running container\n");
+    nk_stderr( "  shell as PID 1        Exit-prone: if process args are /bin/sh, exit stops container\n");
+    nk_stderr( "  keepalive/app PID 1   Preferred: container stays running for exec sessions\n");
     nk_stderr( "\n");
     nk_stderr( "Examples:\n");
     nk_stderr( "  %s create --bundle=/usr/local/share/nano-sandbox/bundle my-container\n", prog_name);
@@ -130,6 +136,9 @@ static void print_usage(const char *prog_name) {
     nk_stderr( "  %s start -a my-container\n", prog_name);
     nk_stderr( "  %s run --bundle=/usr/local/share/nano-sandbox/bundle my-container\n", prog_name);
     nk_stderr( "  %s run -d --bundle=/usr/local/share/nano-sandbox/bundle my-container\n", prog_name);
+    nk_stderr( "  %s exec my-container\n", prog_name);
+    nk_stderr( "  %s exec -x 'ps -ef' my-container\n", prog_name);
+    nk_stderr( "  # Exit-prone only when bundle process is an interactive shell (/bin/sh)\n");
     nk_stderr( "  %s delete my-container\n", prog_name);
     nk_stderr( "\n");
     nk_stderr( "Setup test bundle:\n");
@@ -258,6 +267,7 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
         {"pid-file",    required_argument, 0, 'p'},
         {"attach",      no_argument,       0, 'a'},
         {"detach",      no_argument,       0, 'd'},
+        {"exec",        required_argument, 0, 'x'},
         {"rm",          no_argument,       0,  1 },
         {"verbose",     no_argument,       0, 'V'},
         {"educational", no_argument,       0, 'E'},
@@ -270,9 +280,10 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
     int opt_index = 0;
     bool attach_set = false;
     bool detach_set = false;
+    bool exec_set = false;
     optind = 2; /* Start parsing from argv[2] */
 
-    while ((opt = getopt_long(argc, argv, "b:r:p:adVEhv", long_options, &opt_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "b:r:p:adx:VEhv", long_options, &opt_index)) != -1) {
         switch (opt) {
         case 'b':
             free(opts->bundle_path);
@@ -298,6 +309,11 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
         case 'd':
             opts->detach = true;
             detach_set = true;
+            break;
+        case 'x':
+            free(opts->resume_exec);
+            opts->resume_exec = strdup(optarg);
+            exec_set = true;
             break;
         case 1:
             opts->rm = true;
@@ -342,15 +358,25 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
         }
     } else if (strcmp(opts->command, "start") == 0 ||
                strcmp(opts->command, "run") == 0 ||
+               strcmp(opts->command, "exec") == 0 ||
+               strcmp(opts->command, "resume") == 0 ||
                strcmp(opts->command, "delete") == 0 ||
                strcmp(opts->command, "state") == 0) {
         if (!opts->container_id) {
             nk_stderr( "Error: %s command requires container-id\n", opts->command);
             return -1;
         }
-        if ((strcmp(opts->command, "delete") == 0 || strcmp(opts->command, "state") == 0) &&
+        if ((strcmp(opts->command, "delete") == 0 ||
+             strcmp(opts->command, "state") == 0 ||
+             strcmp(opts->command, "resume") == 0) &&
             (attach_set || detach_set || opts->rm)) {
             nk_stderr("Error: %s does not support --attach/--detach/--rm\n", opts->command);
+            return -1;
+        }
+        if (exec_set &&
+            strcmp(opts->command, "exec") != 0 &&
+            strcmp(opts->command, "resume") != 0) {
+            nk_stderr("Error: --exec is only supported by exec\n");
             return -1;
         }
     } else {
@@ -737,6 +763,146 @@ int nk_container_run(const nk_options_t *opts) {
     return opts->attach ? exit_code : 0;
 }
 
+static int is_pid_alive(pid_t pid) {
+    if (pid <= 0) {
+        return 0;
+    }
+    if (kill(pid, 0) == 0) {
+        return 1;
+    }
+    return errno == EPERM;
+}
+
+static int is_procfs_available(void) {
+    return access("/proc/self/ns/pid", R_OK) == 0;
+}
+
+static int has_pid_namespace_handles(pid_t pid) {
+    char ns_path[64];
+
+    if (pid <= 0) {
+        return 0;
+    }
+    snprintf(ns_path, sizeof(ns_path), "/proc/%d/ns/pid", (int)pid);
+    return access(ns_path, R_OK) == 0;
+}
+
+static void update_stopped_state_if_dead(nk_container_t *container) {
+    if (!container || container->state != NK_STATE_RUNNING || container->init_pid <= 0) {
+        return;
+    }
+
+    if (is_pid_alive(container->init_pid)) {
+        return;
+    }
+
+    nk_log_warn("Container '%s' init process %d is gone; updating state to stopped",
+            container->id, (int)container->init_pid);
+    container->state = NK_STATE_STOPPED;
+    container->init_pid = 0;
+    if (nk_state_save(container) == -1) {
+        nk_log_warn("Failed to persist stopped state for '%s'", container->id);
+    }
+}
+
+int nk_container_resume(const char *container_id, const char *exec_cmd) {
+    int exit_code = 0;
+    nk_container_t *container = NULL;
+
+    nk_log_info("Resuming container '%s'%s",
+            container_id,
+            (exec_cmd && exec_cmd[0] != '\0') ? " (command mode)" : " (interactive shell)");
+
+    container = nk_state_load(container_id);
+    if (!container) {
+        nk_log_error("Container '%s' not found", container_id);
+        return -1;
+    }
+
+    if (container->state != NK_STATE_RUNNING || container->init_pid <= 0) {
+        nk_log_error("Container '%s' is not running (state=%d pid=%d)",
+                container->id, container->state, (int)container->init_pid);
+        nk_container_free(container);
+        return -1;
+    }
+
+    if (!is_pid_alive(container->init_pid)) {
+        update_stopped_state_if_dead(container);
+        nk_log_error("Container '%s' init process %d is not available for namespace entry",
+                container->id, (int)container->init_pid);
+        nk_container_free(container);
+        return -1;
+    }
+
+    if (!is_procfs_available()) {
+        nk_log_error("Host /proc is not mounted or namespace handles are unavailable");
+        nk_log_error("`exec` requires /proc for nsenter (try: mount -t proc proc /proc)");
+        nk_container_free(container);
+        return -1;
+    }
+
+    if (!has_pid_namespace_handles(container->init_pid)) {
+        nk_log_warn("Namespace handles for PID %d are not visible via /proc; attempting nsenter anyway",
+                (int)container->init_pid);
+    }
+
+    char pid_str[32];
+    snprintf(pid_str, sizeof(pid_str), "%d", (int)container->init_pid);
+
+    char *const nsenter_interactive[] = {
+        "nsenter",
+        "--target", pid_str,
+        "--mount", "--uts", "--ipc", "--net", "--pid",
+        "--",
+        "/bin/sh",
+        NULL
+    };
+
+    char *const nsenter_exec[] = {
+        "nsenter",
+        "--target", pid_str,
+        "--mount", "--uts", "--ipc", "--net", "--pid",
+        "--",
+        "/bin/sh", "-lc", (char *)exec_cmd,
+        NULL
+    };
+
+    char *const *argv = (exec_cmd && exec_cmd[0] != '\0') ? nsenter_exec : nsenter_interactive;
+    nk_log_info("Entering namespaces of PID %d via nsenter", (int)container->init_pid);
+
+    pid_t child = fork();
+    if (child == -1) {
+        nk_log_error("Failed to fork resume helper: %s", strerror(errno));
+        nk_container_free(container);
+        return -1;
+    }
+
+    if (child == 0) {
+        execvp("nsenter", argv);
+        nk_stderr("Error: Failed to execute nsenter: %s\n", strerror(errno));
+        _exit(127);
+    }
+
+    int status = 0;
+    if (waitpid(child, &status, 0) == -1) {
+        nk_log_error("Failed waiting for resume command: %s", strerror(errno));
+        nk_container_free(container);
+        return -1;
+    }
+
+    if (WIFEXITED(status)) {
+        exit_code = WEXITSTATUS(status);
+    } else if (WIFSIGNALED(status)) {
+        exit_code = 128 + WTERMSIG(status);
+    } else {
+        exit_code = 1;
+    }
+
+    update_stopped_state_if_dead(container);
+    nk_container_free(container);
+    return exit_code;
+}
+
 int nk_container_delete(const char *container_id) {
     nk_log_info("Deleting container '%s'", container_id);
 
@@ -817,6 +983,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (strcmp(opts.command, "resume") == 0) {
+        nk_log_warn("Command 'resume' is deprecated; use 'exec' instead");
+        opts.command = "exec";
+    }
+
     int ret = 0;
 
     if (strcmp(opts.command, "help") == 0) {
@@ -839,6 +1010,8 @@ int main(int argc, char *argv[]) {
         if (ret == 0 && opts.pid_file && opts.detach) {
             ret = write_container_pid_file(opts.pid_file, opts.container_id);
         }
+    } else if (strcmp(opts.command, "exec") == 0) {
+        ret = nk_container_resume(opts.container_id, opts.resume_exec);
     } else if (strcmp(opts.command, "delete") == 0) {
         ret = nk_container_delete(opts.container_id);
     } else if (strcmp(opts.command, "state") == 0) {
@@ -874,6 +1047,7 @@ int main(int argc, char *argv[]) {
     /* Cleanup options */
     free(opts.bundle_path);
     free(opts.pid_file);
+    free(opts.resume_exec);
 
     return ret;
 }

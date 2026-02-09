@@ -6,7 +6,7 @@ A minimal OCI-compatible container runtime written in C, supporting both pure co
 
 Core runtime flow is implemented and testable end-to-end:
 - OCI spec parsing + validation
-- lifecycle commands: `create`, `start`, `run`, `delete`, `state`
+- lifecycle commands: `create`, `start`, `run`, `exec`, `delete`, `state`
 - namespace/mount/cgroup process startup path
 - structured state persistence
 - smoke/integration/perf script suites
@@ -15,7 +15,9 @@ Core runtime flow is implemented and testable end-to-end:
 
 Architecture and internals live in [`docs/`](docs/README.md):
 - [`docs/architecture.md`](docs/architecture.md)
+- [`docs/container-ecosystem-lifecycle.md`](docs/container-ecosystem-lifecycle.md)
 - [`docs/execution-flow.md`](docs/execution-flow.md)
+- [`docs/exec-design.md`](docs/exec-design.md)
 - [`docs/kernel-mechanisms.md`](docs/kernel-mechanisms.md)
 - [`docs/build-and-test.md`](docs/build-and-test.md)
 
@@ -90,6 +92,7 @@ make distclean
 # After running 'make install', you can use the installed binary
 /usr/local/bin/ns-runtime create --bundle=/usr/local/share/nano-sandbox/bundle test1
 /usr/local/bin/ns-runtime start test1
+/usr/local/bin/ns-runtime exec test1
 /usr/local/bin/ns-runtime run --bundle=/usr/local/share/nano-sandbox/bundle test2
 /usr/local/bin/ns-runtime state test1
 /usr/local/bin/ns-runtime delete test1
@@ -113,6 +116,12 @@ make distclean
 # Run in one step (create + start, attached by default)
 ./build/bin/ns-runtime run --bundle=./tests/bundle myrun
 
+# Re-enter a running container (interactive shell)
+./build/bin/ns-runtime exec mycontainer
+
+# Run one command in a running container
+./build/bin/ns-runtime exec --exec "ps -ef" mycontainer
+
 # Query container state
 ./build/bin/ns-runtime state mycontainer
 
@@ -125,8 +134,54 @@ make distclean
 Command behavior:
 - `start` defaults to detached mode (similar to `docker start`).
 - `run` defaults to attached mode (similar to `docker run`).
+- `exec` re-enters a running container via `nsenter`.
 - Use `-a/--attach` or `-d/--detach` to override.
 - Use `run --rm` to delete container metadata automatically after attached run exits.
+- Default test bundle PID 1 is keepalive (`/bin/busybox sh -c "while :; do /bin/busybox sleep 3600; done"`), so `exec` shell exits do not stop the container.
+- `exec` requires host `/proc` to be mounted because `nsenter` reads `/proc/<pid>/ns/*`.
+
+## PID 1 and Exec Best Practices
+
+Practical rule: PID 1 lifecycle controls container lifecycle.
+
+- If PID 1 is an interactive shell (`/bin/sh`, `/bin/bash`), typing `exit` stops the container.
+- If PID 1 is a long-running app/keepalive process, `exec` shells can come and go without stopping the container.
+
+Exit-prone sandbox pattern (for learning/debugging):
+
+```bash
+# PID 1 is shell, so exit will stop container
+sudo ns-runtime start -a my-container
+exit
+sudo ns-runtime state my-container
+```
+
+Preferred stable pattern (for day-to-day use):
+
+1. Make PID 1 a long-running app (or keepalive) in OCI `config.json`.
+2. Start container detached.
+3. Use `exec` for interactive shells and one-off commands.
+
+Example process args for a stable sandbox:
+
+```json
+"process": {
+  "args": ["/bin/busybox", "sh", "-c", "while :; do /bin/busybox sleep 3600; done"]
+}
+```
+
+Then:
+
+```bash
+sudo ns-runtime start my-container
+sudo ns-runtime exec my-container
+# do work, then exit shell
+exit
+sudo ns-runtime state my-container   # still running
+```
+
+Production note:
+- Prefer running the actual service as PID 1 (or a tiny init like `tini`) so signals and child reaping behave predictably.
 
 ### Testing
 

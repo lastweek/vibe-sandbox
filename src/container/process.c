@@ -157,6 +157,18 @@ static int container_child_fn(void *arg) {
     /* Set resource limits */
     nk_process_set_rlimits();
 
+    /*
+     * Detached/non-terminal workloads should not share the caller's
+     * controlling terminal, otherwise a parent/session exit can deliver SIGHUP.
+     */
+    if (!ctx->terminal) {
+        if (setsid() == -1) {
+            nk_log_warn("Failed to detach child session: %s", strerror(errno));
+        } else {
+            nk_log_debug("Detached child into a new session");
+        }
+    }
+
     /* Notify parent we're ready */
     nk_log_debug("Notifying parent: ready to exec");
     const char ready = CHILD_SYNC_READY;

@@ -4,6 +4,8 @@
 
 `nano-sandbox` is an educational OCI runtime focused on showing how a container runtime is assembled from Linux building blocks. It supports OCI bundle parsing, lifecycle commands, namespace-based isolation, cgroups integration, and structured runtime state.
 
+For stack placement from Dockerfile/image/containerd to OCI runtime, see [`container-ecosystem-lifecycle.md`](container-ecosystem-lifecycle.md).
+
 ## High-Level Topology
 
 ```mermaid
@@ -116,3 +118,11 @@ Container state enum (`include/nk.h`):
 - The runtime is intentionally explicit over abstract; logs expose each lifecycle stage.
 - Child execution readiness uses parent-child synchronization to avoid parent racing ahead before rootfs setup.
 - Test and install pipelines now validate rootfs execution viability (not only file existence).
+- `exec` is modeled as a session-plane operation over a running container, not a lifecycle transition.
+
+## Exec Architecture Pointer
+
+For `exec`-specific architecture, see [`exec-design.md`](exec-design.md), including:
+- mode selection contract (interactive vs `--exec`)
+- lifecycle invariants (when state can or cannot change)
+- host prerequisite and failure boundary model (`/proc`, `nsenter`, privilege)

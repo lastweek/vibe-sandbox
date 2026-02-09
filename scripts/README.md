@@ -43,7 +43,8 @@ Run test suites against the installed runtime (`/usr/local/bin/ns-runtime`).
 
 Coverage notes:
 - `smoke` validates installed bundle/rootfs is executable on current host architecture.
-- `integration` validates `create/start/delete` and `run --rm` lifecycle, and fails if runtime logs child `execve` startup errors.
+- `smoke` validates CLI semantics for `exec`/`--exec`.
+- `integration` validates `create/start/delete`, attached keepalive `run` blocking behavior, `run --rm`, and `exec` lifecycle (success + stale-PID + tool/proc failure paths), and fails if runtime logs child `execve` startup errors.
 - `integration` uses `sudo -n` for runtime actions; run `sudo -v` first in non-interactive environments.
 
 ### `./scripts/bench.sh`
