@@ -9,11 +9,12 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 usage() {
     cat <<USAGE
-Usage: ./scripts/bench.sh [all|latency|throughput|micro]
+Usage: ./scripts/bench.sh [all|latency|start|throughput|micro]
 
 Benchmarks:
   all         Run micro, latency, and throughput benchmarks
   latency     Run API latency benchmark
+  start       Run high-iteration start-latency benchmark
   throughput  Run throughput/stress benchmark
   micro       Run quick microbenchmark
 USAGE
@@ -25,7 +26,7 @@ case "$bench" in
         usage
         exit 0
         ;;
-    all|latency|throughput|micro)
+    all|latency|start|throughput|micro)
         ;;
     *)
         nk_usage_error "unknown benchmark: $bench"
@@ -47,6 +48,9 @@ case "$bench" in
     latency)
         nk_run_named_script "$PERF_DIR/test_api_latency.sh" "API Latency"
         ;;
+    start)
+        nk_run_named_script "$PERF_DIR/test_start_latency.sh" "Start Latency"
+        ;;
     throughput)
         nk_run_named_script "$PERF_DIR/test_throughput.sh" "Throughput & Stress"
         ;;
@@ -56,6 +60,7 @@ case "$bench" in
     all)
         nk_run_named_script "$PERF_DIR/test_microbench.sh" "Microbenchmark"
         nk_run_named_script "$PERF_DIR/test_api_latency.sh" "API Latency"
+        nk_run_named_script "$PERF_DIR/test_start_latency.sh" "Start Latency"
         nk_run_named_script "$PERF_DIR/test_throughput.sh" "Throughput & Stress"
         ;;
 esac

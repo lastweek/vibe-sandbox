@@ -1,6 +1,15 @@
 # nano-sandbox: Educational OCI Container Runtime
 
-A minimal OCI-compatible container runtime written in C, supporting both pure container and VM-based execution via Firecracker.
+A minimal OCI-compatible container runtime written in C, supporting container and VM-oriented execution paths.
+
+Note: This project takes OCI-compatible `config.json` and `rootfs` as input, but does not implement the full OCI Runtime Specification. It focuses on core lifecycle and isolation features, with a simple CLI and structured state management. It is equivalent to a basic `runc`-style implementation, not a full production runtime.
+
+Docker stack context (simplified):
+- `Dockerfile` -> built into an OCI image (layers + metadata)
+- Docker Engine / containerd -> pulls image, unpacks filesystem, prepares OCI bundle (`config.json` + `rootfs`)
+- OCI runtime (`runc`/`crun`) -> performs low-level `create/start/exec/delete` using Linux primitives
+
+`nano-sandbox` sits at the OCI runtime layer. It consumes an OCI bundle and executes the low-level lifecycle/isolation path, but it does not implement higher-level image distribution/build orchestration components.
 
 ## Project Status
 
@@ -10,6 +19,19 @@ Core runtime flow is implemented and testable end-to-end:
 - namespace/mount/cgroup process startup path
 - structured state persistence
 - smoke/integration/perf script suites
+
+## Example Performance (ECS x86_64)
+
+Sample numbers from a full pass on `2026-02-09` using:
+- Host: Ubuntu 24.04 (x86_64 ECS)
+- Command: `NS_RUN_DIR=/run/nano-sandbox ./scripts/bench.sh start`
+- Build: `make -j$(nproc) BUILD_TYPE=release SANITIZE=none && AUTO_ROOTFS=1 make install`
+
+| Benchmark | Workload | Result |
+| --- | --- | --- |
+| Start latency | 500 runs (`VERIFY_RUNNING=1`) | Mean `2.865 ms`, p50 `2.849 ms`, p95 `3.052 ms`, p99 `3.115 ms`, success `500/500` |
+
+These are example measurements, not a strict performance guarantee. Expect variance across kernel version, CPU model, virtualization layer, and storage/network conditions.
 
 ## Documentation
 
@@ -139,6 +161,11 @@ Command behavior:
 - Use `run --rm` to delete container metadata automatically after attached run exits.
 - Default test bundle PID 1 is keepalive (`/bin/busybox sh -c "while :; do /bin/busybox sleep 3600; done"`), so `exec` shell exits do not stop the container.
 - `exec` requires host `/proc` to be mounted because `nsenter` reads `/proc/<pid>/ns/*`.
+
+Logging control:
+- `--log-level=debug|info|warn|error` sets the runtime log level.
+- `--quiet` disables all logging.
+- Environment: `NK_LOG_ENABLED=0` and `NK_LOG_LEVEL=error` override defaults (used by perf scripts).
 
 ## PID 1 and Exec Best Practices
 

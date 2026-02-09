@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -13,6 +14,7 @@ nk_log_level_t nk_log_level = NK_LOG_INFO;
 bool nk_log_enabled = true;
 bool nk_log_educational = false;
 static nk_log_role_t nk_log_role = NK_LOG_ROLE_HOST;
+static bool nk_log_env_applied = false;
 
 /* Log level names */
 static const char *level_names[] = {
@@ -54,6 +56,72 @@ static const char *nk_basename(const char *path) {
     }
     slash = strrchr(path, '/');
     return slash ? slash + 1 : path;
+}
+
+static bool nk_parse_env_bool(const char *value, bool *out) {
+    if (!value || !out) {
+        return false;
+    }
+    if (strcmp(value, "1") == 0 || strcasecmp(value, "true") == 0 ||
+        strcasecmp(value, "yes") == 0 || strcasecmp(value, "on") == 0) {
+        *out = true;
+        return true;
+    }
+    if (strcmp(value, "0") == 0 || strcasecmp(value, "false") == 0 ||
+        strcasecmp(value, "no") == 0 || strcasecmp(value, "off") == 0) {
+        *out = false;
+        return true;
+    }
+    return false;
+}
+
+static bool nk_parse_env_level(const char *value, nk_log_level_t *out) {
+    if (!value || !out) {
+        return false;
+    }
+    if (strcasecmp(value, "debug") == 0 || strcmp(value, "0") == 0) {
+        *out = NK_LOG_DEBUG;
+        return true;
+    }
+    if (strcasecmp(value, "info") == 0 || strcmp(value, "1") == 0) {
+        *out = NK_LOG_INFO;
+        return true;
+    }
+    if (strcasecmp(value, "warn") == 0 || strcasecmp(value, "warning") == 0 || strcmp(value, "2") == 0) {
+        *out = NK_LOG_WARN;
+        return true;
+    }
+    if (strcasecmp(value, "error") == 0 || strcmp(value, "3") == 0) {
+        *out = NK_LOG_ERROR;
+        return true;
+    }
+    return false;
+}
+
+void nk_log_apply_env(void) {
+    const char *env;
+    bool enabled;
+    nk_log_level_t level;
+
+    if (nk_log_env_applied) {
+        return;
+    }
+    nk_log_env_applied = true;
+
+    env = getenv("NK_LOG_ENABLED");
+    if (nk_parse_env_bool(env, &enabled)) {
+        nk_log_enabled = enabled;
+    }
+
+    env = getenv("NK_LOG_LEVEL");
+    if (nk_parse_env_level(env, &level)) {
+        nk_log_level = level;
+    }
+
+    env = getenv("NK_LOG_EDUCATIONAL");
+    if (nk_parse_env_bool(env, &enabled)) {
+        nk_log_educational = enabled;
+    }
 }
 
 /* Educational explanations for common operations */
@@ -121,6 +189,7 @@ void nk_log_set_role(nk_log_role_t role) {
 }
 
 void nk_log_at(nk_log_level_t level, const char *file, int line, const char *fmt, ...) {
+    nk_log_apply_env();
     if (!nk_log_enabled || level < nk_log_level) {
         return;
     }
@@ -162,6 +231,7 @@ void nk_log_at(nk_log_level_t level, const char *file, int line, const char *fmt
 }
 
 void nk_log_explain_at(const char *file, int line, const char *what, const char *why) {
+    nk_log_apply_env();
     if (!nk_log_educational) {
         return;
     }
@@ -192,6 +262,11 @@ void nk_log_explain_at(const char *file, int line, const char *what, const char 
 
 void nk_log_stderr_at(const char *file, int line, const char *fmt, ...) {
     va_list args;
+
+    nk_log_apply_env();
+    if (!nk_log_enabled) {
+        return;
+    }
 
     if (isatty(STDERR_FILENO)) {
         fprintf(stderr, "[%s%s%s] [%s:%d] ",

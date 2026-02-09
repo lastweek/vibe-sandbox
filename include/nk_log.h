@@ -25,6 +25,16 @@ extern bool nk_log_enabled;
 extern bool nk_log_educational;  /* Enable educational explanations */
 
 /**
+ * nk_log_apply_env - Apply environment overrides for logging
+ *
+ * Supported env vars:
+ *  - NK_LOG_ENABLED: 0/1, false/true, no/yes
+ *  - NK_LOG_LEVEL: debug|info|warn|error or 0-3
+ *  - NK_LOG_EDUCATIONAL: 0/1, false/true, no/yes
+ */
+void nk_log_apply_env(void);
+
+/**
  * nk_log_set_level - Set the minimum log level
  * @level: Minimum level to log
  */

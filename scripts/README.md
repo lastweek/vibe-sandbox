@@ -54,6 +54,7 @@ Run performance benchmarks.
 ```bash
 ./scripts/bench.sh
 ./scripts/bench.sh micro
+./scripts/bench.sh start
 ./scripts/bench.sh latency
 ./scripts/bench.sh throughput
 ```

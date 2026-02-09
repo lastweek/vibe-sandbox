@@ -16,7 +16,7 @@ CONCURRENT_COUNTS=(10 50 100)
 cleanup() {
     echo -e "\n${YELLOW}Cleaning up stress containers...${NC}"
     for i in $(seq 1 "$STRESS_COUNT"); do
-        sudo "$NS_RUNTIME_BIN" delete "${TEST_NAME}-stress-${i}-$$" >/dev/null 2>&1 || true
+        "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "${TEST_NAME}-stress-${i}-$$" >/dev/null 2>&1 || true
     done
     echo -e "${GREEN}✓ Cleanup complete${NC}"
 }
@@ -37,9 +37,9 @@ echo "Running ${ITERATIONS} create/start/delete cycles..."
 seq_start=$(date +%s%N)
 for i in $(seq 1 "$ITERATIONS"); do
     id="${TEST_NAME}-seq-${i}-$$"
-    sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1
-    sudo "$NS_RUNTIME_BIN" start "$id" >/dev/null 2>&1
-    sudo "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" start "$id" >/dev/null 2>&1
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
     perf_progress_dot "$i" 10
 done
 seq_end=$(date +%s%N)
@@ -65,9 +65,9 @@ for n in "${CONCURRENT_COUNTS[@]}"; do
     for i in $(seq 1 "$n"); do
         id="${TEST_NAME}-conc-${n}-${i}-$$"
         (
-            sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 &&
-            sudo "$NS_RUNTIME_BIN" start "$id" >/dev/null 2>&1 &&
-            sudo "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1
+            "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 &&
+            "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" start "$id" >/dev/null 2>&1 &&
+            "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1
         ) &
     done
     wait
@@ -92,7 +92,7 @@ stress_start=$(date +%s%N)
 pids=()
 for i in $(seq 1 "$STRESS_COUNT"); do
     id="${TEST_NAME}-stress-${i}-$$"
-    sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 &
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 &
     pids+=("$!")
     perf_progress_dot "$i" 50
 done
@@ -122,7 +122,7 @@ query_id="${TEST_NAME}-stress-1-$$"
 
 query_start=$(date +%s%N)
 for i in $(seq 1 "$QUERY_COUNT"); do
-    "$NS_RUNTIME_BIN" state "$query_id" >/dev/null 2>&1 || true
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" state "$query_id" >/dev/null 2>&1 || true
     perf_progress_dot "$i" 100
 done
 query_end=$(date +%s%N)

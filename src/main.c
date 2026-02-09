@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
@@ -117,6 +118,8 @@ static void print_usage(const char *prog_name) {
     nk_stderr( "  -x, --exec=<command>   Command for exec (default: interactive /bin/sh)\n");
     nk_stderr( "      --rm               Remove container when attached run exits\n");
     nk_stderr( "  -V, --verbose          Enable verbose logging\n");
+    nk_stderr( "  -q, --quiet            Disable all logging\n");
+    nk_stderr( "      --log-level=<lvl>  Set log level: debug|info|warn|error\n");
     nk_stderr( "  -E, --educational      Enable educational mode (explains operations)\n");
     nk_stderr( "  -h, --help            Show this help message\n");
     nk_stderr( "  -v, --version         Show version information\n");
@@ -157,6 +160,29 @@ static const char *safe_str(const char *s) {
 
 static const char *bool_str(bool v) {
     return v ? "true" : "false";
+}
+
+static int parse_log_level(const char *value, nk_log_level_t *out) {
+    if (!value || !out) {
+        return -1;
+    }
+    if (strcasecmp(value, "debug") == 0 || strcmp(value, "0") == 0) {
+        *out = NK_LOG_DEBUG;
+        return 0;
+    }
+    if (strcasecmp(value, "info") == 0 || strcmp(value, "1") == 0) {
+        *out = NK_LOG_INFO;
+        return 0;
+    }
+    if (strcasecmp(value, "warn") == 0 || strcasecmp(value, "warning") == 0 || strcmp(value, "2") == 0) {
+        *out = NK_LOG_WARN;
+        return 0;
+    }
+    if (strcasecmp(value, "error") == 0 || strcmp(value, "3") == 0) {
+        *out = NK_LOG_ERROR;
+        return 0;
+    }
+    return -1;
 }
 
 static void log_oci_start_summary(const nk_container_t *container, const nk_oci_spec_t *spec) {
@@ -270,6 +296,8 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
         {"exec",        required_argument, 0, 'x'},
         {"rm",          no_argument,       0,  1 },
         {"verbose",     no_argument,       0, 'V'},
+        {"quiet",       no_argument,       0, 'q'},
+        {"log-level",   required_argument, 0, 'L'},
         {"educational", no_argument,       0, 'E'},
         {"help",        no_argument,       0, 'h'},
         {"version",     no_argument,       0, 'v'},
@@ -283,7 +311,7 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
     bool exec_set = false;
     optind = 2; /* Start parsing from argv[2] */
 
-    while ((opt = getopt_long(argc, argv, "b:r:p:adx:VEhv", long_options, &opt_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "b:r:p:adx:VEhvqL:", long_options, &opt_index)) != -1) {
         switch (opt) {
         case 'b':
             free(opts->bundle_path);
@@ -321,6 +349,18 @@ int nk_parse_args(int argc, char *argv[], nk_options_t *opts) {
         case 'V':
             nk_log_set_level(NK_LOG_DEBUG);
             break;
+        case 'q':
+            nk_log_enable(false);
+            break;
+        case 'L': {
+            nk_log_level_t level;
+            if (parse_log_level(optarg, &level) != 0) {
+                nk_stderr("Error: invalid log level '%s'\n", optarg);
+                return -1;
+            }
+            nk_log_set_level(level);
+            break;
+        }
         case 'E':
             nk_log_set_educational(true);
             nk_log_set_level(NK_LOG_INFO);

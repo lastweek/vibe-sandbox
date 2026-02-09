@@ -16,6 +16,9 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+PERF_SUDO=()
+PERF_CMD_PREFIX=(env NK_LOG_ENABLED=0 NK_LOG_LEVEL=error NK_LOG_EDUCATIONAL=0)
+
 perf_header() {
     local title="$1"
     echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
@@ -40,6 +43,21 @@ perf_require_env() {
     nk_require_cmd date
     nk_require_cmd bc
     nk_require_cmd sudo
+
+    if [ "$(id -u)" -eq 0 ]; then
+        PERF_SUDO=()
+        return 0
+    fi
+
+    if ! sudo -n true >/dev/null 2>&1; then
+        if [ -t 0 ]; then
+            sudo -v
+        else
+            nk_die "sudo credentials are required for perf benchmarks. Run 'sudo -v' first."
+        fi
+    fi
+
+    PERF_SUDO=(sudo -n)
 }
 
 perf_time_us() {

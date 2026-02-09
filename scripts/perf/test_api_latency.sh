@@ -76,20 +76,20 @@ run_series() {
 
         case "$op" in
             create)
-                t=$(perf_time_us sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id")
+                t=$(perf_time_us "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id")
                 out_ref+=("$t")
-                sudo "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
+                "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
                 ;;
             start)
-                sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 || true
-                t=$(perf_time_us sudo "$NS_RUNTIME_BIN" start "$id")
+                "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 || true
+                t=$(perf_time_us "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" start "$id")
                 out_ref+=("$t")
-                sudo "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
+                "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
                 ;;
             delete)
-                sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 || true
-                sudo "$NS_RUNTIME_BIN" start "$id" >/dev/null 2>&1 || true
-                t=$(perf_time_us sudo "$NS_RUNTIME_BIN" delete "$id")
+                "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 || true
+                "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" start "$id" >/dev/null 2>&1 || true
+                t=$(perf_time_us "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$id")
                 out_ref+=("$t")
                 ;;
             *)
@@ -116,8 +116,8 @@ perf_require_env
 perf_section "Warmup"
 for i in $(seq 1 "$WARMUP_RUNS"); do
     id="${TEST_NAME}-warmup-${i}-$$"
-    sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 || true
-    sudo "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$id" >/dev/null 2>&1 || true
+    "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$id" >/dev/null 2>&1 || true
 done
 echo "Warmup complete"
 echo
@@ -133,15 +133,15 @@ run_series "DELETE Operation Latency" "delete" DELETE_TIMES
 
 perf_section "STATE Query Latency"
 state_id="${TEST_NAME}-state-$$"
-sudo "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$state_id" >/dev/null 2>&1 || true
+"${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" create --bundle="$NS_TEST_BUNDLE" "$state_id" >/dev/null 2>&1 || true
 for i in $(seq 1 "$TEST_RUNS"); do
-    t=$(perf_time_us "$NS_RUNTIME_BIN" state "$state_id")
+    t=$(perf_time_us "${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" state "$state_id")
     STATE_TIMES+=("$t")
     perf_progress_dot "$i" 25
 done
 echo
 echo
-sudo "$NS_RUNTIME_BIN" delete "$state_id" >/dev/null 2>&1 || true
+"${PERF_SUDO[@]}" "${PERF_CMD_PREFIX[@]}" "$NS_RUNTIME_BIN" delete "$state_id" >/dev/null 2>&1 || true
 
 echo -e "${GREEN}STATE Query Results:${NC}"
 printf '%s\n' "${STATE_TIMES[@]}" | calc_stats
